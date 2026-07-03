@@ -14,13 +14,7 @@ def make_session():
 def test_policy_requires_approval_and_honors_suppression():
     settings = Settings(allowed_form_domains="example.jp")
     with make_session() as session:
-        company = Company(
-            name="Example",
-            canonical_domain="example.jp",
-            website_url="https://example.jp",
-            contact_email="info@example.jp",
-            contact_form_url="https://example.jp/contact",
-        )
+        company = Company(name="Example", canonical_domain="example.jp", website_url="https://example.jp", contact_email="info@example.jp", contact_form_url="https://example.jp/contact")
         campaign = Campaign(name="test", subject_template="Hi", body_template="Body")
         session.add(company)
         session.add(campaign)
