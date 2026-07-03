@@ -18,15 +18,8 @@ NO_SOLICITATION_PATTERNS = (
 )
 CONTACT_WORDS = ("お問い合わせ", "問合せ", "contact", "inquiry", "ご相談")
 IGNORED_DOMAINS = {
-    "facebook.com",
-    "instagram.com",
-    "linkedin.com",
-    "twitter.com",
-    "x.com",
-    "youtube.com",
-    "google.com",
-    "yahoo.co.jp",
-    "line.me",
+    "facebook.com", "instagram.com", "linkedin.com", "twitter.com", "x.com",
+    "youtube.com", "google.com", "yahoo.co.jp", "line.me",
 }
 
 
@@ -77,16 +70,10 @@ def extract_contact(html: str, page_url: str) -> ContactDiscovery:
         or title.split("|")[0].split("｜")[0].strip()
         or canonical_domain(page_url)
     )
-
     emails = {normalize_email(value) for value in EMAIL_RE.findall(visible_text)}
     for anchor in soup.select('a[href^="mailto:"]'):
         emails.add(normalize_email(anchor.get("href", "")))
-    emails = {
-        email
-        for email in emails
-        if email and not email.endswith((".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"))
-    }
-
+    emails = {email for email in emails if email and not email.endswith((".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"))}
     phones = {re.sub(r"\s+", "", phone) for phone in PHONE_RE.findall(visible_text)}
     form_url = None
     for form in soup.find_all("form"):
@@ -99,16 +86,8 @@ def extract_contact(html: str, page_url: str) -> ContactDiscovery:
             if any(word.lower() in label for word in CONTACT_WORDS):
                 form_url = urljoin(page_url, anchor["href"])
                 break
-
     evidence = next((pattern for pattern in NO_SOLICITATION_PATTERNS if pattern in visible_text), None)
-    return ContactDiscovery(
-        name=name,
-        emails=sorted(emails),
-        phones=sorted(phones),
-        contact_form_url=form_url,
-        no_solicitation=evidence is not None,
-        no_solicitation_evidence=evidence,
-    )
+    return ContactDiscovery(name=name, emails=sorted(emails), phones=sorted(phones), contact_form_url=form_url, no_solicitation=evidence is not None, no_solicitation_evidence=evidence)
 
 
 def extract_links(html: str, base_url: str, *, same_domain_only: bool | None = None) -> list[str]:
