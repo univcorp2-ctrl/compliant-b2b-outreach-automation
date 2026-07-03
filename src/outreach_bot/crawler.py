@@ -41,18 +41,13 @@ class CompliantCrawler:
             response.raise_for_status()
         except httpx.HTTPError:
             return None
-        content_type = response.headers.get("content-type", "")
-        if "text/html" not in content_type:
+        if "text/html" not in response.headers.get("content-type", ""):
             return None
         return response.text
 
     async def discover_domains(self, seed_urls: list[str]) -> list[tuple[str, str]]:
         discovered: dict[str, tuple[str, str]] = {}
-        async with httpx.AsyncClient(
-            headers={"User-Agent": self.settings.user_agent},
-            timeout=self.settings.request_timeout_seconds,
-            follow_redirects=True,
-        ) as client:
+        async with httpx.AsyncClient(headers={"User-Agent": self.settings.user_agent}, timeout=self.settings.request_timeout_seconds, follow_redirects=True) as client:
             for seed in seed_urls:
                 html = await self._fetch(client, seed)
                 if html is None:
@@ -62,7 +57,8 @@ class CompliantCrawler:
                 for url in extract_links(html, seed, same_domain_only=False):
                     domain = canonical_domain(url)
                     if domain and domain not in discovered:
-                        discovered[domain] = (f"{urlsplit(url).scheme}://{urlsplit(url).netloc}/", seed)
+                        parts = urlsplit(url)
+                        discovered[domain] = (f"{parts.scheme}://{parts.netloc}/", seed)
                     if len(discovered) >= self.settings.max_discovered_domains_per_seed:
                         break
                 await asyncio.sleep(self.settings.crawl_delay_seconds)
@@ -75,11 +71,7 @@ class CompliantCrawler:
         queue = deque([homepage])
         visited: set[str] = set()
         best = None
-        async with httpx.AsyncClient(
-            headers={"User-Agent": self.settings.user_agent},
-            timeout=self.settings.request_timeout_seconds,
-            follow_redirects=True,
-        ) as client:
+        async with httpx.AsyncClient(headers={"User-Agent": self.settings.user_agent}, timeout=self.settings.request_timeout_seconds, follow_redirects=True) as client:
             while queue and len(visited) < self.settings.max_pages_per_domain:
                 url = queue.popleft()
                 if url in visited or canonical_domain(url) != domain:
@@ -103,17 +95,7 @@ class CompliantCrawler:
                 await asyncio.sleep(self.settings.crawl_delay_seconds)
         if best is None:
             return None
-        return Company(
-            name=best.name,
-            canonical_domain=domain,
-            website_url=homepage,
-            source_url=source_url,
-            contact_email=best.emails[0] if best.emails else None,
-            contact_phone=best.phones[0] if best.phones else None,
-            contact_form_url=best.contact_form_url,
-            no_solicitation=best.no_solicitation,
-            no_solicitation_evidence=best.no_solicitation_evidence,
-        )
+        return Company(name=best.name, canonical_domain=domain, website_url=homepage, source_url=source_url, contact_email=best.emails[0] if best.emails else None, contact_phone=best.phones[0] if best.phones else None, contact_form_url=best.contact_form_url, no_solicitation=best.no_solicitation, no_solicitation_evidence=best.no_solicitation_evidence)
 
     async def crawl(self, session: Session, seed_urls: list[str]) -> list[Company]:
         targets = await self.discover_domains(seed_urls)
@@ -122,20 +104,9 @@ class CompliantCrawler:
             found = await self.crawl_company(homepage, source_url)
             if found is None:
                 continue
-            existing = session.exec(
-                select(Company).where(Company.canonical_domain == found.canonical_domain)
-            ).first()
+            existing = session.exec(select(Company).where(Company.canonical_domain == found.canonical_domain)).first()
             if existing:
-                for field in (
-                    "name",
-                    "website_url",
-                    "source_url",
-                    "contact_email",
-                    "contact_phone",
-                    "contact_form_url",
-                    "no_solicitation",
-                    "no_solicitation_evidence",
-                ):
+                for field in ("name", "website_url", "source_url", "contact_email", "contact_phone", "contact_form_url", "no_solicitation", "no_solicitation_evidence"):
                     value = getattr(found, field)
                     if value not in (None, "", False):
                         setattr(existing, field, value)
@@ -158,11 +129,7 @@ def import_companies_csv(session: Session, path: Path) -> int:
                 continue
             domain = canonical_domain(website)
             existing = session.exec(select(Company).where(Company.canonical_domain == domain)).first()
-            company = existing or Company(
-                name=(row.get("name") or domain).strip(),
-                canonical_domain=domain,
-                website_url=website,
-            )
+            company = existing or Company(name=(row.get("name") or domain).strip(), canonical_domain=domain, website_url=website)
             company.contact_email = (row.get("contact_email") or row.get("email") or "").strip() or None
             company.contact_form_url = (row.get("contact_form_url") or "").strip() or None
             company.contact_phone = (row.get("contact_phone") or row.get("phone") or "").strip() or None
