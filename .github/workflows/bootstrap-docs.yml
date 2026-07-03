@@ -1,0 +1,38 @@
+name: Bootstrap README image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - docs/README.template.md
+      - docs/architecture.svg
+      - .github/workflows/bootstrap-docs.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-readme:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Render architecture image
+        run: |
+          python -m pip install cairosvg
+          mkdir -p docs/assets
+          python - <<'PY'
+          import cairosvg
+          cairosvg.svg2png(url='docs/architecture.svg', write_to='docs/assets/generated-readme-hero.png', output_width=1400, output_height=760)
+          PY
+          cp docs/README.template.md README.md
+      - name: Commit generated documentation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md docs/assets/generated-readme-hero.png
+          git diff --cached --quiet || git commit -m "docs: render generated architecture overview"
+          git push
