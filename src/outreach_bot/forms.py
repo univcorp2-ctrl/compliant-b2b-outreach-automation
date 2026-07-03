@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from pathlib import Path
 
 from playwright.async_api import Page, async_playwright
 
@@ -28,29 +27,17 @@ async def _fill_first(page: Page, selectors: tuple[str, ...], value: str) -> boo
     return False
 
 
-async def submit_contact_form(
-    company: Company,
-    subject: str,
-    message: str,
-    settings: Settings,
-    *,
-    dry_run: bool,
-) -> FormResult:
+async def submit_contact_form(company: Company, subject: str, message: str, settings: Settings, *, dry_run: bool) -> FormResult:
     if not company.contact_form_url:
         return FormResult("skipped", "missing_form")
     domain = canonical_domain(company.contact_form_url)
     if domain not in settings.form_domain_allowlist:
         return FormResult("skipped", "form_domain_not_allowlisted")
-
     settings.artifacts_dir.mkdir(parents=True, exist_ok=True)
     if dry_run or not settings.live_forms:
         artifact = settings.artifacts_dir / f"form-{company.canonical_domain}.txt"
-        artifact.write_text(
-            f"URL: {company.contact_form_url}\nSUBJECT: {subject}\nMESSAGE:\n{message}\n",
-            encoding="utf-8",
-        )
+        artifact.write_text(f"URL: {company.contact_form_url}\nSUBJECT: {subject}\nMESSAGE:\n{message}\n", encoding="utf-8")
         return FormResult("dry_run", artifact=str(artifact))
-
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -62,40 +49,14 @@ async def submit_contact_form(
                 return FormResult("skipped", "captcha_detected")
             if any(pattern in visible_text for pattern in NO_SOLICITATION_PATTERNS):
                 return FormResult("skipped", "no_solicitation_detected")
-
-            await _fill_first(
-                page,
-                ('input[name*="company" i]', 'input[name*="corp" i]', 'input[placeholder*="会社"]'),
-                settings.sender_company,
-            )
-            await _fill_first(
-                page,
-                ('input[name*="name" i]', 'input[placeholder*="氏名"]', 'input[placeholder*="お名前"]'),
-                settings.sender_name,
-            )
-            await _fill_first(
-                page,
-                ('input[type="email"]', 'input[name*="mail" i]'),
-                settings.sender_email,
-            )
-            await _fill_first(
-                page,
-                ('input[type="tel"]', 'input[name*="phone" i]', 'input[name*="tel" i]'),
-                settings.sender_phone,
-            )
-            await _fill_first(
-                page,
-                ('input[name*="subject" i]', 'input[placeholder*="件名"]'),
-                subject,
-            )
-            filled_message = await _fill_first(
-                page,
-                ('textarea[name*="message" i]', 'textarea[name*="body" i]', "textarea"),
-                message,
-            )
+            await _fill_first(page, ('input[name*="company" i]', 'input[name*="corp" i]', 'input[placeholder*="会社"]'), settings.sender_company)
+            await _fill_first(page, ('input[name*="name" i]', 'input[placeholder*="氏名"]', 'input[placeholder*="お名前"]'), settings.sender_name)
+            await _fill_first(page, ('input[type="email"]', 'input[name*="mail" i]'), settings.sender_email)
+            await _fill_first(page, ('input[type="tel"]', 'input[name*="phone" i]', 'input[name*="tel" i]'), settings.sender_phone)
+            await _fill_first(page, ('input[name*="subject" i]', 'input[placeholder*="件名"]'), subject)
+            filled_message = await _fill_first(page, ('textarea[name*="message" i]', 'textarea[name*="body" i]', "textarea"), message)
             if not filled_message:
                 return FormResult("skipped", "message_field_not_found")
-
             screenshot = settings.artifacts_dir / f"form-before-submit-{company.canonical_domain}.png"
             await page.screenshot(path=str(screenshot), full_page=True)
             submit = page.locator('button[type="submit"], input[type="submit"]').first
