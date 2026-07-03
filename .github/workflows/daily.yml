@@ -1,0 +1,73 @@
+name: Daily company refresh and outreach
+
+on:
+  schedule:
+    - cron: "0 0 * * *" # 09:00 JST
+  workflow_dispatch:
+    inputs:
+      campaign_id:
+        description: "Approved campaign ID (blank = refresh only)"
+        required: false
+        type: string
+      live:
+        description: "Run live delivery; requires repository variable OUTREACH_LIVE_APPROVED=true"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  daily:
+    runs-on: ubuntu-latest
+    env:
+      OUTREACH_SENDER_NAME: ${{ vars.OUTREACH_SENDER_NAME }}
+      OUTREACH_SENDER_EMAIL: ${{ vars.OUTREACH_SENDER_EMAIL }}
+      OUTREACH_SENDER_COMPANY: ${{ vars.OUTREACH_SENDER_COMPANY }}
+      OUTREACH_SENDER_PHONE: ${{ vars.OUTREACH_SENDER_PHONE }}
+      OUTREACH_OPT_OUT_EMAIL: ${{ vars.OUTREACH_OPT_OUT_EMAIL }}
+      OUTREACH_ALLOWED_FORM_DOMAINS: ${{ vars.OUTREACH_ALLOWED_FORM_DOMAINS }}
+      OUTREACH_DAILY_LIMIT: ${{ vars.OUTREACH_DAILY_LIMIT || '20' }}
+      OUTREACH_LIVE_EMAIL: ${{ vars.OUTREACH_LIVE_APPROVED == 'true' && inputs.live == true }}
+      OUTREACH_LIVE_FORMS: ${{ vars.OUTREACH_LIVE_APPROVED == 'true' && inputs.live == true }}
+      OUTREACH_SMTP_HOST: ${{ secrets.OUTREACH_SMTP_HOST }}
+      OUTREACH_SMTP_USERNAME: ${{ secrets.OUTREACH_SMTP_USERNAME }}
+      OUTREACH_SMTP_PASSWORD: ${{ secrets.OUTREACH_SMTP_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/cache/restore@v4
+        with:
+          path: data/outreach.db
+          key: outreach-db-${{ github.run_id }}
+          restore-keys: outreach-db-
+      - run: python -m pip install .
+      - name: Install browser only for approved live form runs
+        if: ${{ vars.OUTREACH_LIVE_APPROVED == 'true' && inputs.live == true }}
+        run: python -m playwright install --with-deps chromium
+      - name: Refresh and optionally execute campaign
+        shell: bash
+        run: |
+          args=(daily --seed-file data/seeds.txt)
+          if [[ -n "${{ inputs.campaign_id }}" ]]; then args+=(--campaign-id "${{ inputs.campaign_id }}"); fi
+          if [[ "${{ vars.OUTREACH_LIVE_APPROVED }}" == "true" && "${{ inputs.live }}" == "true" ]]; then args+=(--live); fi
+          outreach-bot "${args[@]}"
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: data/outreach.db
+          key: outreach-db-${{ github.run_id }}
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: outreach-results-${{ github.run_id }}
+          path: |
+            exports/
+            artifacts/
+            data/outreach.db
+          if-no-files-found: warn
+          retention-days: 30
