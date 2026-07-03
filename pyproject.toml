@@ -1,0 +1,51 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "compliant-b2b-outreach-automation"
+version = "0.1.0"
+description = "Compliance-first B2B company discovery and outreach automation"
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "MIT"}
+authors = [{name = "GitHub-GPT Developer"}]
+dependencies = [
+  "beautifulsoup4>=4.12,<5",
+  "email-validator>=2.2,<3",
+  "fastapi>=0.115,<1",
+  "httpx>=0.28,<1",
+  "jinja2>=3.1,<4",
+  "playwright>=1.50,<2",
+  "pydantic-settings>=2.7,<3",
+  "python-multipart>=0.0.20,<1",
+  "sqlmodel>=0.0.22,<1",
+  "typer>=0.15,<1",
+  "uvicorn[standard]>=0.34,<1"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3,<9",
+  "pytest-asyncio>=0.25,<1",
+  "pytest-cov>=6,<7",
+  "ruff>=0.9,<1"
+]
+
+[project.scripts]
+outreach-bot = "outreach_bot.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/outreach_bot"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.pytest.ini_options]
+addopts = "-q --cov=outreach_bot --cov-report=term-missing --cov-report=xml"
+testpaths = ["tests"]
+asyncio_mode = "auto"
