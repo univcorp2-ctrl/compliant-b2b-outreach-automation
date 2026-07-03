@@ -17,6 +17,4 @@ def test_extract_contact_and_refusal():
     assert result.contact_form_url == "https://www.example.jp/contact"
     assert result.no_solicitation is True
     assert canonical_domain("https://www.EXAMPLE.jp/a") == "example.jp"
-    assert extract_links(html, "https://www.example.jp/about", same_domain_only=False) == [
-        "https://partner.example.com/"
-    ]
+    assert extract_links(html, "https://www.example.jp/about", same_domain_only=False) == ["https://partner.example.com/"]
