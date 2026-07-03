@@ -10,7 +10,7 @@ on:
         required: false
         type: string
       live:
-        description: "Run live delivery; requires repository variable OUTREACH_LIVE_APPROVED=true"
+        description: "Run live delivery; requires OUTREACH_LIVE_APPROVED=true"
         required: false
         default: false
         type: boolean
