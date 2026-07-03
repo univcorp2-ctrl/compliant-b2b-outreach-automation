@@ -18,13 +18,7 @@ def idempotency_key(company_id: int, campaign_id: int, channel: str) -> str:
     return f"company:{company_id}:campaign:{campaign_id}:channel:{channel}"
 
 
-def can_contact(
-    session: Session,
-    company: Company,
-    campaign: Campaign,
-    channel: str,
-    settings: Settings,
-) -> PolicyDecision:
+def can_contact(session: Session, company: Company, campaign: Campaign, channel: str, settings: Settings) -> PolicyDecision:
     if not campaign.approved:
         return PolicyDecision(False, "campaign_not_approved")
     if not campaign.active or not company.active:
@@ -37,41 +31,22 @@ def can_contact(
         return PolicyDecision(False, "missing_email")
     if channel == "form" and not company.contact_form_url:
         return PolicyDecision(False, "missing_form")
-
     domain = canonical_domain(company.website_url)
     suppressed_values = {domain}
     if company.contact_email:
         suppressed_values.add(normalize_email(company.contact_email))
-    suppressions = session.exec(select(Suppression)).all()
-    if any(item.value.lower() in suppressed_values for item in suppressions):
+    if any(item.value.lower() in suppressed_values for item in session.exec(select(Suppression)).all()):
         return PolicyDecision(False, "suppressed")
-
     key = idempotency_key(company.id or 0, campaign.id or 0, channel)
     if session.exec(select(OutreachAttempt).where(OutreachAttempt.idempotency_key == key)).first():
         return PolicyDecision(False, "already_attempted")
-
     today = datetime.now(UTC).date()
-    attempts_today = session.exec(
-        select(OutreachAttempt).where(
-            OutreachAttempt.campaign_id == campaign.id,
-            OutreachAttempt.attempted_on == today,
-            OutreachAttempt.status.in_(["sent", "submitted", "dry_run"]),
-        )
-    ).all()
-    limit = min(campaign.daily_limit, settings.daily_limit)
-    if len(attempts_today) >= limit:
+    attempts_today = session.exec(select(OutreachAttempt).where(OutreachAttempt.campaign_id == campaign.id, OutreachAttempt.attempted_on == today, OutreachAttempt.status.in_(["sent", "submitted", "dry_run"]))).all()
+    if len(attempts_today) >= min(campaign.daily_limit, settings.daily_limit):
         return PolicyDecision(False, "daily_limit_reached")
-
-    same_domain_today = [
-        attempt
-        for attempt in attempts_today
-        if canonical_domain(attempt.destination) == domain
-        or attempt.destination.lower().endswith(f"@{domain}")
-    ]
+    same_domain_today = [attempt for attempt in attempts_today if canonical_domain(attempt.destination) == domain or attempt.destination.lower().endswith(f"@{domain}")]
     if len(same_domain_today) >= settings.per_domain_daily_limit:
         return PolicyDecision(False, "per_domain_limit_reached")
-
     if channel == "form" and domain not in settings.form_domain_allowlist:
         return PolicyDecision(False, "form_domain_not_allowlisted")
-
     return PolicyDecision(True, "allowed")
