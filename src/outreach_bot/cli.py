@@ -17,11 +17,7 @@ app = typer.Typer(no_args_is_help=True, help="Compliance-first B2B outreach auto
 def _read_seeds(path: Path) -> list[str]:
     if not path.exists():
         return []
-    return [
-        line.strip()
-        for line in path.read_text(encoding="utf-8").splitlines()
-        if line.strip() and not line.lstrip().startswith("#")
-    ]
+    return [line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip() and not line.lstrip().startswith("#")]
 
 
 @app.command("init-db")
@@ -31,10 +27,7 @@ def init_database() -> None:
 
 
 @app.command()
-def crawl(
-    seed: list[str] = typer.Option([], "--seed"),
-    seed_file: Path | None = typer.Option(None, "--seed-file"),
-) -> None:
+def crawl(seed: list[str] = typer.Option([], "--seed"), seed_file: Path | None = typer.Option(None, "--seed-file")) -> None:
     init_db()
     seeds = list(seed)
     if seed_file:
@@ -56,21 +49,9 @@ def import_csv(path: Path) -> None:
 
 
 @app.command("create-campaign")
-def create_campaign(
-    name: str,
-    subject: str,
-    body_file: Path,
-    channels: str = "email,form",
-    daily_limit: int = 20,
-) -> None:
+def create_campaign(name: str, subject: str, body_file: Path, channels: str = "email,form", daily_limit: int = 20) -> None:
     init_db()
-    campaign = Campaign(
-        name=name,
-        subject_template=subject,
-        body_template=body_file.read_text(encoding="utf-8"),
-        channels=channels,
-        daily_limit=daily_limit,
-    )
+    campaign = Campaign(name=name, subject_template=subject, body_template=body_file.read_text(encoding="utf-8"), channels=channels, daily_limit=daily_limit)
     with Session(get_engine()) as session:
         session.add(campaign)
         session.commit()
@@ -95,9 +76,7 @@ def approve_campaign(campaign_id: int) -> None:
 def run_campaign_command(campaign_id: int, live: bool = False) -> None:
     init_db()
     with Session(get_engine()) as session:
-        stats = asyncio.run(
-            run_campaign(session, campaign_id, get_settings(), dry_run=not live)
-        )
+        stats = asyncio.run(run_campaign(session, campaign_id, get_settings(), dry_run=not live))
     typer.echo(stats)
 
 
@@ -110,11 +89,7 @@ def export(path: Path = Path("exports/companies.csv")) -> None:
 
 
 @app.command()
-def daily(
-    seed_file: Path = Path("data/seeds.txt"),
-    campaign_id: int | None = None,
-    live: bool = False,
-) -> None:
+def daily(seed_file: Path = Path("data/seeds.txt"), campaign_id: int | None = None, live: bool = False) -> None:
     init_db()
     seeds = _read_seeds(seed_file)
     with Session(get_engine()) as session:
@@ -122,9 +97,7 @@ def daily(
             asyncio.run(CompliantCrawler(get_settings()).crawl(session, seeds))
         export_companies(session, get_settings().exports_dir / "companies.csv")
         if campaign_id is not None:
-            stats = asyncio.run(
-                run_campaign(session, campaign_id, get_settings(), dry_run=not live)
-            )
+            stats = asyncio.run(run_campaign(session, campaign_id, get_settings(), dry_run=not live))
             typer.echo(stats)
 
 
