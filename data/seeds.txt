@@ -1,0 +1,2 @@
+# 1行1URLで、利用規約とrobots.txt上で収集が認められる業界団体・公開事業者一覧・自社保有リストのURLを記載します。
+# 例: https://directory.example.jp/members
