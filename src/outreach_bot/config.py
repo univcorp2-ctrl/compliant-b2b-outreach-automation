@@ -32,7 +32,6 @@ class Settings(BaseSettings):
 
     live_email: bool = False
     live_forms: bool = False
-    enable_playwright_fetch: bool = False
     allowed_form_domains: str = ""
     artifacts_dir: Path = Path("artifacts")
     exports_dir: Path = Path("exports")
