@@ -48,8 +48,7 @@ def companies(session: Session = Depends(get_session)):
 
 @app.post("/crawl")
 async def crawl(payload: CrawlRequest, session: Session = Depends(get_session)):
-    crawler = CompliantCrawler(get_settings())
-    found = await crawler.crawl(session, payload.seeds)
+    found = await CompliantCrawler(get_settings()).crawl(session, payload.seeds)
     return {"discovered": len(found)}
 
 
@@ -75,11 +74,7 @@ def approve_campaign(campaign_id: int, session: Session = Depends(get_session)):
 
 
 @app.post("/campaigns/{campaign_id}/run")
-async def execute_campaign(
-    campaign_id: int,
-    dry_run: bool = True,
-    session: Session = Depends(get_session),
-):
+async def execute_campaign(campaign_id: int, dry_run: bool = True, session: Session = Depends(get_session)):
     try:
         return await run_campaign(session, campaign_id, get_settings(), dry_run=dry_run)
     except ValueError as exc:
